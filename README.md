@@ -1,5 +1,19 @@
 # tg — Telegram CLI for humans and agents
 
+## Hardened fork
+
+This fork is maintained at [maxvinters/gotd-cli](https://github.com/maxvinters/gotd-cli).
+Security changes and compatibility notes are documented in [SECURITY-HARDENING.md](SECURITY-HARDENING.md).
+Build this fork from its checkout with Go 1.27.3 or newer; the upstream module path is retained for internal imports.
+
+```sh
+git clone https://github.com/maxvinters/gotd-cli.git
+cd gotd-cli
+go build -trimpath -o tg ./cmd/tg
+```
+
+Use your own Telegram application credentials for source builds. No live account is needed for the default test suite.
+
 `tg` is a single static Go binary for driving a Telegram **personal account** (or a
 bot) from the command line or an AI agent: message yourself, list and triage chats,
 read history, send/forward/edit/delete messages, upload and download files, manage
@@ -9,23 +23,22 @@ Built on [`gotd/td`](https://github.com/gotd/td).
 
 ## Installation
 
-Download a prebuilt binary or package (`.deb`/`.rpm`/`.apk`) for your platform from
-the [latest release](https://github.com/gotd/cli/releases/latest).
+Build from source using the commands above. This fork has no published hardened
+release yet; upstream binaries do not contain these fixes.
 
 ## Quick start
 
 ```console
-$ tg init                                          # write config (release binaries embed app credentials)
+$ tg init --app-id APP_ID --app-hash APP_HASH       # write config
 $ tg login                                         # QR login — scan once from a logged-in device
 $ tg whoami                                         # confirm you're authenticated
 $ tg send "Hello world"                             # message yourself (Saved Messages)
 $ tg send --peer @gotd_test "Hello world"           # message a peer
 ```
 
-App credentials are required. The prebuilt [release](https://github.com/gotd/cli/releases/latest)
-binaries embed them at build time and present the session as a desktop client, so
-`tg init` just works. If you build from source, provide your own from
-<https://my.telegram.org>: `tg init --app-id APP_ID --app-hash APP_HASH`.
+App credentials are required. Get your own from
+<https://my.telegram.org> and pass them to `tg init --app-id APP_ID --app-hash APP_HASH`.
+Source builds contain no embedded credentials.
 
 The config is written to the `gotd` subdirectory of your config dir, e.g.
 `~/.config/gotd/gotd.cli.yaml`. The session persists too, so subsequent commands
@@ -39,11 +52,12 @@ instead (useful for headless macOS). Other platforms always use a file.
 ```console
 $ tg login                     # QR (default): scan from Settings → Devices → Link Desktop Device
 $ tg login --phone +1234567890  # phone-code login (use --phone= to be prompted for the number)
-$ TG_PASSWORD=secret tg login   # supply the 2FA cloud password non-interactively
+$ tg login                     # or supply TG_PASSWORD through your secret manager
 ```
 
-Bot login still works too: provide a token via `tg init --token <bot-token>` and pass
-`--bot` to commands that support it (e.g. `tg whoami --bot`).
+For optional bot login, supply `BOT_TOKEN` through your secret manager before
+running `tg init`, then pass `--bot` to commands that support it (e.g. `tg whoami --bot`).
+Password and bot-token flags are rejected to keep secrets out of process arguments.
 
 ## Agent-friendly by design
 
@@ -68,9 +82,9 @@ the JSON/peers conventions, the `--yes` safety gate, and common recipes. Install
 with [`skills`](https://www.npmjs.com/package/skills):
 
 ```console
-$ npx skills add https://github.com/gotd/cli --all
+$ npx skills add https://github.com/maxvinters/gotd-cli --all
 # or a single skill:
-$ npx skills add https://github.com/gotd/cli --skill tg
+$ npx skills add https://github.com/maxvinters/gotd-cli --skill tg
 ```
 
 ## What you can do
@@ -123,7 +137,7 @@ number. Test mode only switches the DC list — it uses the same app credentials
 production (so the same app-id/app-hash requirement applies):
 
 ```console
-$ tg init --test                # persists test: true
+$ tg init --app-id APP_ID --app-hash APP_HASH --test # persists test: true
 $ tg login --phone 9996621234   # test number for DC 2; the code is 22222
 $ tg whoami
 ```

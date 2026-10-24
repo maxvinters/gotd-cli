@@ -11,6 +11,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 // reactionItem is one reaction with its count.
@@ -33,7 +35,7 @@ func (r reactionsResult) MarshalText(w io.Writer) error {
 	}
 	parts := make([]string, 0, len(r.Reactions))
 	for _, it := range r.Reactions {
-		s := fmt.Sprintf("%s %d", it.Reaction, it.Count)
+		s := fmt.Sprintf("%s %d", output.EscapeTerminalText(it.Reaction), it.Count)
 		if it.Chosen {
 			s += "*"
 		}

@@ -4,45 +4,33 @@ package pretty
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"os"
 	"time"
 
 	"github.com/gotd/td/bin"
-	"github.com/gotd/td/tdp"
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/tg"
+	"github.com/gotd/td/tgerr"
 )
 
-// Middleware pretty-prints request and response.
+// Middleware logs RPC types and timing without exposing request or response data.
 func Middleware() telegram.MiddlewareFunc {
 	return func(next tg.Invoker) telegram.InvokeFunc {
 		return func(ctx context.Context, input bin.Encoder, output bin.Decoder) error {
-			fmt.Println("→", formatObject(input))
+			_, _ = fmt.Fprintf(os.Stderr, "→ %T\n", input)
 			start := time.Now()
-			if err := next.Invoke(ctx, input, output); err != nil {
-				fmt.Println("←", err)
+			err := next.Invoke(ctx, input, output)
+			elapsed := time.Since(start).Round(time.Millisecond)
+			if err != nil {
+				code := "unknown"
+				if rpcErr, ok := tgerr.As(err); ok {
+					code = fmt.Sprint(rpcErr.Code)
+				}
+				_, _ = fmt.Fprintf(os.Stderr, "← %T (%s) error_code=%s\n", output, elapsed, code)
 				return err
 			}
-
-			fmt.Printf("← (%s) %s\n", time.Since(start).Round(time.Millisecond), formatObject(output))
-
+			_, _ = fmt.Fprintf(os.Stderr, "← %T (%s)\n", output, elapsed)
 			return nil
 		}
 	}
-}
-
-func formatObject(input interface{}) string {
-	o, ok := input.(tdp.Object)
-	if !ok {
-		// Handle tg.*Box values.
-		rv := reflect.Indirect(reflect.ValueOf(input))
-		for i := 0; i < rv.NumField(); i++ {
-			if v, ok := rv.Field(i).Interface().(tdp.Object); ok {
-				return formatObject(v)
-			}
-		}
-
-		return fmt.Sprintf("%T (not object)", input)
-	}
-	return tdp.Format(o)
 }

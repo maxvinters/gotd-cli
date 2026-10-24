@@ -109,7 +109,8 @@ credentials, a bot token, or a per-account proxy.
 ## Bots
 
 ```bash
-tg init --token <bot-token>
+# Supply BOT_TOKEN through a secret manager before invoking tg.
+tg init
 tg whoami --bot
 # pass --bot to commands that support a bot session
 ```
@@ -136,3 +137,11 @@ tg <command> --help    # flags + examples for one command
 Notes:
 - `--test` is set at config time (`tg init --test`), not per command.
 - Errors print to stderr prefixed with `tg:`; a non-zero exit means failure.
+
+## Security behavior in this fork
+
+Never put passwords or bot tokens in command arguments or shell-history literals.
+Use the hidden interactive password prompt, or TG_PASSWORD/BOT_TOKEN supplied through a secret manager.
+Downloads reject unsafe remote filenames and existing output paths. Do not retry by deleting files without user authorization.
+Existing globally named Keychain sessions are not adopted; each config needs its own fresh login.
+Configuration, file-session and cache files must be private (0600 on Unix); repair permissions deliberately before reading them.

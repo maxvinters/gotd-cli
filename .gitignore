@@ -18,3 +18,15 @@ out
 gen
 
 dist/
+
+# Local analysis, account state and credentials
+graphify-out/
+.tg-state/
+gotd.cli.yaml
+gotd.session.*
+gotd.peers.*
+.env
+.env.*
+work/
+
+/tg

@@ -146,7 +146,7 @@ func writeDevice(w io.Writer, d deviceInfo) error {
 	if sys != "" {
 		title += " · " + sys
 	}
-	if _, err := fmt.Fprintf(w, "  %s\n", title); err != nil {
+	if _, err := fmt.Fprintf(w, "  %s\n", output.EscapeTerminalText(title)); err != nil {
 		return err
 	}
 
@@ -161,7 +161,7 @@ func writeDevice(w io.Writer, d deviceInfo) error {
 		app += ", official"
 	}
 	app += ")"
-	if _, err := fmt.Fprintf(w, "    %s\n", app); err != nil {
+	if _, err := fmt.Fprintf(w, "    %s\n", output.EscapeTerminalText(app)); err != nil {
 		return err
 	}
 
@@ -173,7 +173,7 @@ func writeDevice(w io.Writer, d deviceInfo) error {
 		loc += place
 	}
 	if loc != "" {
-		if _, err := fmt.Fprintf(w, "    %s\n", loc); err != nil {
+		if _, err := fmt.Fprintf(w, "    %s\n", output.EscapeTerminalText(loc)); err != nil {
 			return err
 		}
 	}

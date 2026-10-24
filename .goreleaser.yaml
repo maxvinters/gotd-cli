@@ -5,9 +5,7 @@ project_name: tg
 before:
   hooks:
     # You may remove this if you don't use go modules.
-    - go mod tidy
-    # you may remove this if you don't need go generate
-    - go generate ./...
+    - go mod tidy -diff
 builds:
   - env:
       - CGO_ENABLED=0
@@ -46,8 +44,8 @@ changelog:
       - '^test:'
 nfpms:
   - package_name: tg
-    homepage: https://github.com/gotd/cli
-    maintainer: Aleksandr Razumov <ernado@ya.ru>
+    homepage: https://github.com/maxvinters/gotd-cli
+    maintainer: maxvinters
     description: Command line interface for Telegram using gotd
     license: MIT
     formats:

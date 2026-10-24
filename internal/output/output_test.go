@@ -2,6 +2,7 @@ package output
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"strings"
 	"testing"
@@ -64,5 +65,32 @@ func TestPrinterTextUsesMarshaler(t *testing.T) {
 	}
 	if got := buf.String(); got != "name=durov" {
 		t.Errorf("text = %q, want %q", got, "name=durov")
+	}
+}
+
+func TestPrinterTextEscapesTerminalControlsAndKeepsUnicode(t *testing.T) {
+	var buf bytes.Buffer
+	if err := New(Text, &buf).Emit(sample{Name: "résumé\x1b[2J\r"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := buf.String(), "name=résumé\\x1b[2J\\r"; got != want {
+		t.Fatalf("text = %q, want %q", got, want)
+	}
+}
+
+func TestPrinterJSONPreservesControlCharactersAndUnicode(t *testing.T) {
+	const name = "résumé\x1b[2J\r"
+	var buf bytes.Buffer
+	if err := New(JSON, &buf).Emit(sample{Name: name}); err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Data sample `json:"data"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON %q: %v", buf.String(), err)
+	}
+	if got.Data.Name != name {
+		t.Fatalf("JSON name = %q, want %q", got.Data.Name, name)
 	}
 }

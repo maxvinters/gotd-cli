@@ -89,6 +89,9 @@ that account the default used when --account / TG_ACCOUNT is not set.`,
 				return err
 			}
 			label := args[0]
+			if err := validateAccountLabel(label); err != nil {
+				return err
+			}
 			if _, err := a.cfg.account(label); err != nil {
 				return err
 			}
@@ -115,10 +118,17 @@ func (a *app) newAccountsAddCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add <label>",
 		Short: "Add or update a named account",
-		Long:  "Add a named account to the config. Then run: tg login --account <label>.",
-		Args:  cobra.ExactArgs(1),
+		Long: `Add a named account to the config. Set BOT_TOKEN through your secret
+manager to attach an optional bot token. Then run: tg login --account <label>.`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if cmd.Flags().Changed("token") {
+				return errors.New("do not pass bot tokens in argv; set BOT_TOKEN instead")
+			}
 			label := args[0]
+			if err := validateAccountLabel(label); err != nil {
+				return err
+			}
 			if label == defaultAccount {
 				return errors.New("use tg init for the default account")
 			}
@@ -143,7 +153,8 @@ func (a *app) newAccountsAddCmd() *cobra.Command {
 	fs := cmd.Flags()
 	fs.IntVar(&appID, "app-id", envInt("APP_ID"), "telegram app ID")
 	fs.StringVar(&appHash, "app-hash", os.Getenv("APP_HASH"), "telegram app hash")
-	fs.StringVar(&token, "token", "", "optional bot token")
+	fs.StringVar(&token, "token", os.Getenv("BOT_TOKEN"), "optional bot token (set BOT_TOKEN instead of passing a secret in argv)")
+	_ = fs.MarkHidden("token")
 	fs.StringVar(&proxy, "proxy", "", "optional per-account proxy URL")
 	fs.BoolVar(&test, "test", false, "create the account against the telegram test server")
 
@@ -157,6 +168,9 @@ func (a *app) newAccountsRemoveCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			label := args[0]
+			if err := validateAccountLabel(label); err != nil {
+				return err
+			}
 			if _, ok := a.cfg.Accounts[label]; !ok {
 				return errors.Errorf("unknown account %q", label)
 			}

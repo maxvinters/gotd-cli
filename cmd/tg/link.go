@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 // linkResult is the result of `tg link`.
@@ -20,7 +22,7 @@ type linkResult struct {
 
 // MarshalText prints the link.
 func (r linkResult) MarshalText(w io.Writer) error {
-	_, err := fmt.Fprintln(w, r.Link)
+	_, err := fmt.Fprintln(w, output.EscapeTerminalText(r.Link))
 	return err
 }
 

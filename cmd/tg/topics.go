@@ -11,6 +11,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 // randomID returns a random int64 suitable for MTProto random_id fields.
@@ -36,7 +38,7 @@ type topicsResult struct {
 // MarshalText renders one topic per line.
 func (r topicsResult) MarshalText(w io.Writer) error {
 	for _, t := range r.Topics {
-		if _, err := fmt.Fprintf(w, "#%d %s\n", t.ID, t.Title); err != nil {
+		if _, err := fmt.Fprintf(w, "#%d %s\n", t.ID, output.EscapeTerminalText(t.Title)); err != nil {
 			return err
 		}
 	}

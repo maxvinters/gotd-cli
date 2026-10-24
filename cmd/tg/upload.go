@@ -51,7 +51,7 @@ type uploadResult struct {
 // MarshalText renders one uploaded file per line.
 func (r uploadResult) MarshalText(w io.Writer) error {
 	for _, f := range r.Files {
-		if _, err := fmt.Fprintf(w, "uploaded %s as message #%d\n", f.Path, f.MessageID); err != nil {
+		if _, err := fmt.Fprintf(w, "uploaded %s as message #%d\n", output.EscapeTerminalText(f.Path), f.MessageID); err != nil {
 			return err
 		}
 	}

@@ -11,6 +11,8 @@ import (
 
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 func (a *app) newLogoutCmd() *cobra.Command {
@@ -54,7 +56,8 @@ files are removed even if it fails (e.g. the session is already invalid).`,
 					return nil
 				})
 			if err != nil {
-				_, _ = fmt.Fprintln(os.Stderr, "Warning: remote logout failed, removing local session anyway:", err)
+				_, _ = fmt.Fprintln(os.Stderr, "Warning: remote logout failed, removing local session anyway:",
+					output.EscapeTerminalText(err.Error()))
 			}
 
 			// Remove the local session and peer cache regardless.

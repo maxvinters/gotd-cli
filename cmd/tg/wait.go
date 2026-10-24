@@ -10,6 +10,8 @@ import (
 
 	"github.com/gotd/td/telegram"
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 func (a *app) newWaitCmd() *cobra.Command {
@@ -72,9 +74,9 @@ func (a *app) newWaitCmd() *cobra.Command {
 
 // MarshalText renders a single watch event for `tg wait` text output.
 func (e watchEvent) MarshalText(w io.Writer) error {
-	line := e.Peer.label()
+	line := output.EscapeTerminalText(e.Peer.label())
 	if e.Message.Text != "" {
-		line += ": " + e.Message.Text
+		line += ": " + output.EscapeTerminalText(e.Message.Text)
 	}
 	_, err := w.Write([]byte(line + "\n"))
 	return err

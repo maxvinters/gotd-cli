@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 func main() {
@@ -15,9 +17,9 @@ func main() {
 		// Concise message by default; full chain + stack with TG_DEBUG for
 		// troubleshooting. All diagnostics go to stderr.
 		if os.Getenv("TG_DEBUG") != "" {
-			fmt.Fprintf(os.Stderr, "%+v\n", err)
+			fmt.Fprintln(os.Stderr, output.EscapeTerminalText(fmt.Sprintf("%+v", err)))
 		} else {
-			fmt.Fprintf(os.Stderr, "tg: %v\n", err)
+			fmt.Fprintf(os.Stderr, "tg: %s\n", output.EscapeTerminalText(err.Error()))
 		}
 		os.Exit(1)
 	}

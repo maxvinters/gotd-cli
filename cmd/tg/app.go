@@ -113,7 +113,7 @@ func (a *app) before(cmd *cobra.Command) error {
 
 // selectedLabels returns the account labels the command should run against.
 func (a *app) selectedLabels() ([]string, error) {
-	if a.accountFlag == "all" {
+	if a.accountFlag == allAccountsLabel {
 		labels := a.cfg.labels()
 		if len(labels) == 0 {
 			return nil, errors.New("no configured accounts")

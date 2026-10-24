@@ -10,6 +10,8 @@ import (
 
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 // chatInfo is the result of `tg chat get`.
@@ -50,7 +52,7 @@ func (c chatFullResult) MarshalText(w io.Writer) error {
 		}
 	}
 	if c.About != "" {
-		if _, err := fmt.Fprintf(w, "about: %s\n", c.About); err != nil {
+		if _, err := fmt.Fprintf(w, "about: %s\n", output.EscapeTerminalText(c.About)); err != nil {
 			return err
 		}
 	}

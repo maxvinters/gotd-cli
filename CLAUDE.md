@@ -35,12 +35,12 @@ go run ./cmd/tg <command> --help     # run the CLI locally (binary is package cm
 go test ./...                        # all tests
 go test -race ./...                  # race detector (what CI runs)
 go test ./cmd/tg/ -run TestName      # a single test
-golangci-lint run ./...              # lint (config in .golangci.yml; CI pins v2.12.1)
+go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run ./...              # lint (config in .golangci.yml; CI pins v2.15.0)
 gofmt -l .                           # list misformatted files; gofmt -w to fix
 go mod tidy                          # CI fails if this produces a diff
 ```
 
-Go 1.25. Releases are cut by pushing a `v*` tag, which triggers GoReleaser
+Go 1.27.3 or newer. Releases are cut by pushing a `v*` tag, which triggers GoReleaser
 (`.github/workflows/release.yml`); the release build embeds app credentials via `-ldflags` and
 fails if the `APP_ID`/`APP_HASH` secrets are missing.
 

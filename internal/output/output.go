@@ -7,10 +7,13 @@
 package output
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/go-faster/errors"
 )
@@ -46,6 +49,24 @@ func ParseFormat(s string) (Format, error) {
 // Results without it fall back to fmt's default formatting in text mode.
 type TextMarshaler interface {
 	MarshalText(w io.Writer) error
+}
+
+// EscapeTerminalText makes control characters visible while preserving Unicode.
+func EscapeTerminalText(s string) string { return escapeTerminal(s, false) }
+
+func escapeTerminalOutput(s string) string { return escapeTerminal(s, true) }
+
+func escapeTerminal(s string, preserveLayout bool) string {
+	var b strings.Builder
+	for _, r := range s {
+		if !unicode.IsControl(r) || preserveLayout && (r == '\n' || r == '\t') {
+			b.WriteRune(r)
+			continue
+		}
+		quoted := strconv.QuoteRuneToASCII(r)
+		b.WriteString(quoted[1 : len(quoted)-1])
+	}
+	return b.String()
 }
 
 // Printer writes command results in the configured format.
@@ -84,16 +105,18 @@ func (p *Printer) Emit(v any) error {
 		return nil
 	}
 
+	var text bytes.Buffer
 	if p.account != "" {
-		if _, err := fmt.Fprintf(p.w, "== %s ==\n", p.account); err != nil {
-			return errors.Wrap(err, "write account header")
-		}
+		fmt.Fprintf(&text, "== %s ==\n", p.account)
 	}
-
 	if tm, ok := v.(TextMarshaler); ok {
-		return tm.MarshalText(p.w)
+		if err := tm.MarshalText(&text); err != nil {
+			return err
+		}
+	} else {
+		fmt.Fprintln(&text, v)
 	}
-	if _, err := fmt.Fprintln(p.w, v); err != nil {
+	if _, err := io.WriteString(p.w, escapeTerminalOutput(text.String())); err != nil {
 		return errors.Wrap(err, "write text")
 	}
 	return nil

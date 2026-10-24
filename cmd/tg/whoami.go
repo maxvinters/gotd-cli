@@ -44,10 +44,10 @@ func (r whoamiResult) MarshalText(w io.Writer) error {
 		parts = append(parts, fmt.Sprintf("name=%q", name))
 	}
 	if r.Username != "" {
-		parts = append(parts, "username=@"+r.Username)
+		parts = append(parts, "username=@"+output.EscapeTerminalText(r.Username))
 	}
 	if r.Phone != "" {
-		parts = append(parts, "phone=+"+r.Phone)
+		parts = append(parts, "phone=+"+output.EscapeTerminalText(r.Phone))
 	}
 	if r.Bot {
 		parts = append(parts, "bot=true")

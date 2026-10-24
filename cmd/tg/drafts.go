@@ -10,6 +10,8 @@ import (
 
 	"github.com/gotd/td/telegram/query"
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 // draftItem is one saved draft.
@@ -27,7 +29,7 @@ type draftsResult struct {
 // MarshalText renders one draft per line.
 func (r draftsResult) MarshalText(w io.Writer) error {
 	for _, d := range r.Drafts {
-		if _, err := fmt.Fprintf(w, "%-24s %s\n", d.Peer.label(), truncate(d.Message, 60)); err != nil {
+		if _, err := fmt.Fprintf(w, "%-24s %s\n", d.Peer.label(), output.EscapeTerminalText(truncate(d.Message, 60))); err != nil {
 			return err
 		}
 	}
