@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/gotd/td/telegram/peers"
@@ -76,7 +77,7 @@ func TestCacheWritesArePrivateAndRejectSymlinks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := info.Mode().Perm(); got != 0o600 {
+	if got := info.Mode().Perm(); runtime.GOOS != "windows" && got != 0o600 {
 		t.Fatalf("rewritten cache mode = %04o, want 0600", got)
 	}
 
