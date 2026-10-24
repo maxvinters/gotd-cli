@@ -41,10 +41,13 @@ A bot token is optional — most commands use a personal user session created wi
   # Your own app credentials (required for source builds)
   tg init --app-id 10 --app-hash abcd
 
-  # With an optional bot token
-  tg init --app-id 10 --app-hash abcd --token <bot-token>`,
+  # With an optional bot token (set BOT_TOKEN via your secret manager)
+  tg init --app-id 10 --app-hash abcd`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if cmd.Flags().Changed("token") {
+				return errors.New("do not pass bot tokens in argv; set BOT_TOKEN instead")
+			}
 			if a.configPath == "" {
 				return errors.New("no config path provided")
 			}
@@ -68,7 +71,8 @@ A bot token is optional — most commands use a personal user session created wi
 	fs := cmd.Flags()
 	fs.IntVar(&appID, "app-id", envInt("APP_ID"), "telegram app ID (default: built-in)")
 	fs.StringVar(&appHash, "app-hash", os.Getenv("APP_HASH"), "telegram app hash (default: built-in)")
-	fs.StringVar(&token, "token", os.Getenv("BOT_TOKEN"), "optional telegram bot token")
+	fs.StringVar(&token, "token", os.Getenv("BOT_TOKEN"), "optional bot token (set BOT_TOKEN instead of passing a secret in argv)")
+	_ = fs.MarkHidden("token")
 	fs.StringVar(&proxy, "proxy", os.Getenv("TG_PROXY"), "optional proxy URL (socks5://, tg://proxy?...)")
 	fs.BoolVar(&test, "test", false, "create the account against the telegram test server")
 

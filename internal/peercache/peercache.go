@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-faster/errors"
 
+	"github.com/gotd/cli/internal/privatefile"
 	"github.com/gotd/td/telegram/peers"
 )
 
@@ -47,7 +48,7 @@ func Open(path string) (*Storage, error) {
 		},
 	}
 
-	raw, err := os.ReadFile(path) // #nosec G304 // path derived from config dir
+	raw, err := privatefile.Read(path) // #nosec G304 // path derived from config dir
 	if err != nil {
 		if os.IsNotExist(err) {
 			return s, nil
@@ -78,7 +79,7 @@ func (s *Storage) flush() error {
 	if err != nil {
 		return errors.Wrap(err, "marshal peer cache")
 	}
-	if err := os.WriteFile(s.path, raw, 0o600); err != nil {
+	if err := privatefile.Write(s.path, raw); err != nil {
 		return errors.Wrap(err, "write peer cache")
 	}
 	return nil

@@ -10,6 +10,8 @@ import (
 
 	"github.com/gotd/td/telegram/query"
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 // messageItem describes one message.
@@ -41,7 +43,7 @@ func (h historyResult) MarshalText(w io.Writer) error {
 			line += " " + m.From.label()
 		}
 		if m.Text != "" {
-			line += " " + m.Text
+			line += " " + output.EscapeTerminalText(m.Text)
 		}
 		if m.Media != "" {
 			line += " [" + m.Media + "]"

@@ -44,7 +44,7 @@ type parsed struct {
 func parse(raw string) (parsed, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return parsed{}, errors.Wrap(err, "parse proxy url")
+		return parsed{}, errors.New("invalid proxy URL")
 	}
 
 	switch scheme := strings.ToLower(u.Scheme); scheme {
@@ -53,7 +53,7 @@ func parse(raw string) (parsed, error) {
 	case "tg", "mtproxy":
 		return parseMTProxy(u)
 	default:
-		return parsed{}, errors.Errorf("unsupported proxy scheme %q (use socks5:// or tg://proxy?...)", scheme)
+		return parsed{}, errors.New("unsupported proxy scheme (use socks5:// or tg://proxy?...)")
 	}
 }
 
@@ -83,7 +83,7 @@ func decodeSecret(s string) ([]byte, error) {
 	if b, err := base64.RawURLEncoding.DecodeString(s); err == nil {
 		return b, nil
 	}
-	return nil, errors.Errorf("invalid mtproxy secret %q (want hex or base64url)", s)
+	return nil, errors.New("invalid mtproxy secret (want hex or base64url)")
 }
 
 // Resolver returns a dcs.Resolver for the given proxy URL, or (nil, nil) when

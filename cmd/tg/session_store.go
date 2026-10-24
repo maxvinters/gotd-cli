@@ -2,10 +2,17 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
+	"sync"
+
+	"github.com/go-faster/errors"
 
 	"github.com/gotd/td/session"
+
+	"github.com/gotd/cli/internal/privatefile"
 )
 
 // sessionService is the Keychain service name under which sessions are stored.
@@ -26,17 +33,44 @@ type sessionStore interface {
 // existence/deletion over the same path.
 type fileSessionStore struct {
 	*session.FileStorage
+	mu sync.Mutex
 }
 
 func (s *fileSessionStore) Exists(context.Context) (bool, error) {
-	switch _, err := os.Stat(s.Path); {
+	info, err := os.Lstat(s.Path)
+	switch {
 	case err == nil:
+		if !info.Mode().IsRegular() {
+			return false, errors.Errorf("session path %s is not a regular file", s.Path)
+		}
 		return true, nil
 	case os.IsNotExist(err):
 		return false, nil
 	default:
 		return false, err
 	}
+}
+
+func (s *fileSessionStore) LoadSession(context.Context) ([]byte, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	data, err := privatefile.Read(s.Path)
+	if os.IsNotExist(err) {
+		return nil, session.ErrNotFound
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, "read session")
+	}
+	return data, nil
+}
+
+func (s *fileSessionStore) StoreSession(_ context.Context, data []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := privatefile.Write(s.Path, data); err != nil {
+		return errors.Wrap(err, "write session")
+	}
+	return nil
 }
 
 func (s *fileSessionStore) Delete(context.Context) error {
@@ -53,15 +87,26 @@ func keychainAccount(label string, acc Account, kind string) string {
 	return label + "." + kind + "." + acc.seed(label, kind)
 }
 
+// keychainService namespaces entries by the full config path so separate config
+// files cannot share sessions.
+func keychainService(configPath string) string {
+	configPath, err := filepath.Abs(configPath)
+	if err != nil {
+		configPath = filepath.Clean(configPath)
+	}
+	sum := sha256.Sum256([]byte(configPath))
+	return sessionService + "." + hex.EncodeToString(sum[:])
+}
+
 // newSessionStore selects the backend. On macOS with Keychain enabled (the
 // default) it returns the Keychain backend; otherwise it falls back to a file in
 // the config directory.
-func newSessionStore(dir, label string, acc Account, kind string, useKeychain bool) sessionStore {
-	path := acc.sessionPath(dir, label, kind)
+func newSessionStore(configPath, label string, acc Account, kind string, useKeychain bool) sessionStore {
+	path := acc.sessionPath(filepath.Dir(configPath), label, kind)
 	if useKeychain {
-		// path is handed to the Keychain backend so it can migrate (and clean
-		// up) a pre-Keychain file session on first use.
-		if ks, ok := keychainSessionStore(sessionService, keychainAccount(label, acc, kind), path); ok {
+		// Only the scoped legacy file migrates; the old global Keychain item is
+		// intentionally left untouched because its config identity is ambiguous.
+		if ks, ok := keychainSessionStore(keychainService(configPath), keychainAccount(label, acc, kind), path); ok {
 			return ks
 		}
 	}
@@ -76,5 +121,5 @@ func (a *app) useKeychain() bool {
 
 // sessionStore builds the session store for an account label + auth kind.
 func (a *app) sessionStore(label string, acc Account, kind string) sessionStore {
-	return newSessionStore(filepath.Dir(a.configPath), label, acc, kind, a.useKeychain())
+	return newSessionStore(a.configPath, label, acc, kind, a.useKeychain())
 }

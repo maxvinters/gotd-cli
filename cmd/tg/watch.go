@@ -100,7 +100,7 @@ func emitLine(format output.Format, account string, ev watchEvent) {
 	if account != "" {
 		line = "[" + account + "] " + line
 	}
-	_, _ = fmt.Fprintln(os.Stdout, line)
+	_, _ = fmt.Fprintln(os.Stdout, output.EscapeTerminalText(line))
 }
 
 func (a *app) newWatchCmd() *cobra.Command {
@@ -182,7 +182,7 @@ func (a *app) watchWith(ctx context.Context, st *accountState, header string, ar
 			}
 			stream.register(d)
 
-			_, _ = fmt.Fprintf(os.Stderr, "Watching %s for new messages (Ctrl-C to stop)…\n", st.label)
+			_, _ = fmt.Fprintf(os.Stderr, "Watching %s for new messages (Ctrl-C to stop)…\n", output.EscapeTerminalText(st.label))
 			<-ctx.Done()
 			return nil
 		})

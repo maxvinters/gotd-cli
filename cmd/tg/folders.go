@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 // folderItem is one dialog filter (folder).
@@ -27,7 +29,7 @@ type foldersResult struct {
 // MarshalText renders one folder per line.
 func (r foldersResult) MarshalText(w io.Writer) error {
 	for _, f := range r.Folders {
-		if _, err := fmt.Fprintf(w, "#%d %s\n", f.ID, f.Title); err != nil {
+		if _, err := fmt.Fprintf(w, "#%d %s\n", f.ID, output.EscapeTerminalText(f.Title)); err != nil {
 			return err
 		}
 	}

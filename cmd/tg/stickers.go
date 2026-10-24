@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 // stickerSetItem describes an installed sticker set.
@@ -27,7 +29,9 @@ type stickerSetsResult struct {
 // MarshalText renders one sticker set per line.
 func (r stickerSetsResult) MarshalText(w io.Writer) error {
 	for _, s := range r.Sets {
-		if _, err := fmt.Fprintf(w, "%-32s %s (%d)\n", s.Title, s.ShortName, s.Count); err != nil {
+		title := output.EscapeTerminalText(s.Title)
+		shortName := output.EscapeTerminalText(s.ShortName)
+		if _, err := fmt.Fprintf(w, "%-32s %s (%d)\n", title, shortName, s.Count); err != nil {
 			return err
 		}
 	}

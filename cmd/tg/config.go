@@ -10,10 +10,15 @@ import (
 
 	"github.com/go-faster/errors"
 	"gopkg.in/yaml.v3"
+
+	"github.com/gotd/cli/internal/privatefile"
 )
 
 // defaultAccount is the label of the top-level (legacy) account.
 const defaultAccount = "default"
+
+// allAccountsLabel is the selector for operations across every configured account.
+const allAccountsLabel = "all"
 
 // Account holds the credentials and proxy for one Telegram account.
 type Account struct {
@@ -69,11 +74,45 @@ func (c Config) account(label string) (Account, error) {
 	if label == "" || label == defaultAccount {
 		return c.defaultAcc(), nil
 	}
+	if err := validateAccountLabel(label); err != nil {
+		return Account{}, err
+	}
 	a, ok := c.Accounts[label]
 	if !ok {
 		return Account{}, errors.Errorf("unknown account %q (see tg accounts)", label)
 	}
 	return a, nil
+}
+
+func validateAccountLabel(label string) error {
+	if label == "" || len(label) > 64 || label == allAccountsLabel {
+		return errors.Errorf("invalid account label %q", label)
+	}
+	for i := 0; i < len(label); i++ {
+		c := label[i]
+		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') &&
+			(c < '0' || c > '9') && c != '-' && c != '_' {
+			return errors.Errorf("invalid account label %q", label)
+		}
+	}
+	return nil
+}
+
+func (c Config) validate() error {
+	if c.DefaultAccount != "" {
+		if err := validateAccountLabel(c.DefaultAccount); err != nil {
+			return errors.Wrap(err, "default account")
+		}
+	}
+	for label := range c.Accounts {
+		if label == defaultAccount {
+			return errors.New("account label \"default\" is reserved")
+		}
+		if err := validateAccountLabel(label); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // labels returns all account labels, default first. The default account always
@@ -95,7 +134,7 @@ func loadConfig(path string) (Config, error) {
 		return cfg, errors.New("no config path provided")
 	}
 
-	data, err := os.ReadFile(path) // #nosec G304 // path provided via flag
+	data, err := privatefile.Read(path) // #nosec G304 // path provided via flag
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return cfg, errors.Errorf("no config at %s; run `tg init` first", path)
@@ -105,11 +144,17 @@ func loadConfig(path string) (Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return cfg, errors.Wrap(err, "parse config")
 	}
+	if err := cfg.validate(); err != nil {
+		return Config{}, errors.Wrap(err, "validate config")
+	}
 	return cfg, nil
 }
 
 // writeConfig writes cfg to path, refusing to overwrite an existing file.
 func writeConfig(path string, cfg Config) error {
+	if err := cfg.validate(); err != nil {
+		return errors.Wrap(err, "validate config")
+	}
 	buf := new(bytes.Buffer)
 	e := yaml.NewEncoder(buf)
 	e.SetIndent(2)
@@ -117,13 +162,13 @@ func writeConfig(path string, cfg Config) error {
 		return errors.Wrap(err, "encode")
 	}
 
-	if _, err := os.Stat(path); err == nil {
+	if _, err := os.Lstat(path); err == nil {
 		return errors.Errorf("file %s exists", path)
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	if err := os.WriteFile(path, buf.Bytes(), 0o600); err != nil {
+	if err := privatefile.Create(path, buf.Bytes()); err != nil {
 		return errors.Wrap(err, "write")
 	}
 	return nil
@@ -131,6 +176,9 @@ func writeConfig(path string, cfg Config) error {
 
 // saveConfig writes cfg to path, overwriting any existing file.
 func saveConfig(path string, cfg Config) error {
+	if err := cfg.validate(); err != nil {
+		return errors.Wrap(err, "validate config")
+	}
 	buf := new(bytes.Buffer)
 	e := yaml.NewEncoder(buf)
 	e.SetIndent(2)
@@ -140,7 +188,7 @@ func saveConfig(path string, cfg Config) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	if err := os.WriteFile(path, buf.Bytes(), 0o600); err != nil {
+	if err := privatefile.Write(path, buf.Bytes()); err != nil {
 		return errors.Wrap(err, "write")
 	}
 	return nil

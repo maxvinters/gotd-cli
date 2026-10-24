@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -46,13 +47,28 @@ func TestFileSessionStore(t *testing.T) {
 	dir := t.TempDir()
 	acc := Account{AppID: 42}
 	// keychain off → file backend regardless of platform.
-	store := newSessionStore(dir, defaultAccount, acc, kindUser, false)
+	configPath := filepath.Join(dir, "config.yaml")
+	store := newSessionStore(configPath, defaultAccount, acc, kindUser, false)
 
 	if ok, err := store.Exists(ctx); err != nil || ok {
 		t.Fatalf("Exists() = %v, %v; want false, nil", ok, err)
 	}
 	if err := store.StoreSession(ctx, []byte("blob")); err != nil {
 		t.Fatalf("StoreSession: %v", err)
+	}
+	path := acc.sessionPath(filepath.Dir(configPath), defaultAccount, kindUser)
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.StoreSession(ctx, []byte("blob")); err != nil {
+		t.Fatalf("StoreSession rewrite: %v", err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); runtime.GOOS != "windows" && got != 0o600 {
+		t.Fatalf("rewritten session mode = %04o, want 0600", got)
 	}
 	if ok, err := store.Exists(ctx); err != nil || !ok {
 		t.Fatalf("Exists() after store = %v, %v; want true, nil", ok, err)
@@ -72,7 +88,47 @@ func TestFileSessionStore(t *testing.T) {
 		t.Fatalf("second Delete: %v", err)
 	}
 	// File lands at the expected path.
-	if _, err := os.Stat(filepath.Join(dir, "gotd.session."+defaultAccount+"."+kindUser+"."+acc.seed(defaultAccount, kindUser)+".json")); err == nil {
+	if _, err := os.Stat(path); err == nil {
 		t.Fatal("session file should be gone after delete")
+	}
+}
+
+func TestFileSessionStoreRejectsSymlink(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	acc := Account{AppID: 42}
+	path := acc.sessionPath(dir, defaultAccount, kindUser)
+	target := filepath.Join(dir, "target.json")
+	if err := os.WriteFile(target, []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	store := newSessionStore(filepath.Join(dir, "config.yaml"), defaultAccount, acc, kindUser, false)
+	if err := store.StoreSession(ctx, []byte("overwrite")); err == nil {
+		t.Fatal("StoreSession accepted a symlink destination")
+	}
+	if _, err := store.LoadSession(ctx); err == nil {
+		t.Fatal("LoadSession followed a symlink")
+	}
+	got, err := os.ReadFile(target)
+	if err != nil || string(got) != "keep" {
+		t.Fatalf("symlink target = %q, %v; want unchanged", got, err)
+	}
+}
+
+func TestKeychainServiceScopesFullConfigPath(t *testing.T) {
+	dir := t.TempDir()
+	first := keychainService(filepath.Join(dir, "one.yaml"))
+	second := keychainService(filepath.Join(dir, "two.yaml"))
+	if first == sessionService || second == sessionService {
+		t.Fatal("keychain service still uses the old global name")
+	}
+	if first == second {
+		t.Fatal("distinct config files share a Keychain service")
+	}
+	if first != keychainService(filepath.Join(dir, ".", "one.yaml")) {
+		t.Fatal("equivalent config paths produced different Keychain services")
 	}
 }

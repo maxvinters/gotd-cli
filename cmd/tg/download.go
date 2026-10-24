@@ -7,12 +7,16 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"unicode"
 
 	"github.com/go-faster/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/gotd/td/telegram/downloader"
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 // downloadResult is the result of `tg download`.
@@ -23,7 +27,7 @@ type downloadResult struct {
 
 // MarshalText renders a short summary.
 func (r downloadResult) MarshalText(w io.Writer) error {
-	_, err := fmt.Fprintf(w, "downloaded %s (%d bytes)\n", r.Path, r.Size)
+	_, err := fmt.Fprintf(w, "downloaded %s (%d bytes)\n", output.EscapeTerminalText(r.Path), r.Size)
 	return err
 }
 
@@ -132,6 +136,99 @@ func resolveOutPath(out, defaultName string) string {
 	return out
 }
 
+func validateRemoteFilename(name string) error {
+	if name == "" || name == "." || name == ".." || filepath.IsAbs(name) ||
+		filepath.VolumeName(name) != "" || strings.ContainsAny(name, `/\\:`) {
+		return errors.New("invalid remote filename")
+	}
+	if strings.HasSuffix(name, ".") || strings.HasSuffix(name, " ") || windowsReservedDeviceName(name) {
+		return errors.New("invalid remote filename")
+	}
+	for _, r := range name {
+		if unicode.IsControl(r) {
+			return errors.New("invalid remote filename")
+		}
+	}
+	return nil
+}
+
+func windowsReservedDeviceName(name string) bool {
+	base := name
+	if i := strings.IndexByte(base, '.'); i >= 0 {
+		base = base[:i]
+	}
+	base = strings.TrimRight(base, " .")
+	base = strings.ToUpper(base)
+	switch base {
+	case "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$":
+		return true
+	}
+	runes := []rune(base)
+	if len(runes) != 4 || (string(runes[:3]) != "COM" && string(runes[:3]) != "LPT") {
+		return false
+	}
+	switch runes[3] {
+	case '1', '2', '3', '4', '5', '6', '7', '8', '9', '¹', '²', '³':
+		return true
+	default:
+		return false
+	}
+}
+
+func hasTrailingPathSeparator(path string, separator rune) bool {
+	if strings.HasSuffix(path, string(separator)) {
+		return true
+	}
+	return separator == '\\' && strings.HasSuffix(path, "/")
+}
+
+// saveDownload creates an output file without following or replacing an
+// existing file, then streams into the opened file descriptor.
+func saveDownload(out, remoteName string, download func(io.WriterAt) error) (result downloadResult, retErr error) {
+	if err := validateRemoteFilename(remoteName); err != nil {
+		return downloadResult{}, err
+	}
+
+	path := resolveOutPath(out, remoteName)
+	if out != "" && path == out && hasTrailingPathSeparator(out, filepath.Separator) {
+		return downloadResult{}, errors.New("output directory does not exist")
+	}
+	parent, name := filepath.Dir(path), filepath.Base(path)
+	if name == "." || name == string(filepath.Separator) {
+		return downloadResult{}, errors.New("invalid output file path")
+	}
+	root, err := os.OpenRoot(parent)
+	if err != nil {
+		return downloadResult{}, errors.Wrap(err, "open output directory")
+	}
+	defer func() {
+		if err := root.Close(); retErr == nil && err != nil {
+			result = downloadResult{}
+			retErr = errors.Wrap(err, "close output directory")
+		}
+	}()
+	file, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return downloadResult{}, errors.Wrap(err, "create output file")
+	}
+	defer func() {
+		if err := file.Close(); retErr == nil && err != nil {
+			result = downloadResult{}
+			retErr = errors.Wrap(err, "close downloaded file")
+		}
+	}()
+
+	if err := download(file); err != nil {
+		// Root.Remove is name-based, so it cannot safely distinguish a replacement.
+		return downloadResult{}, errors.Wrapf(err, "partial download retained at %s", output.EscapeTerminalText(path))
+	}
+	info, err := file.Stat()
+	if err != nil {
+		return downloadResult{}, errors.Wrap(err, "stat downloaded file")
+	}
+	return downloadResult{Path: path, Size: info.Size()}, nil
+}
+
 func (a *app) newDownloadCmd() *cobra.Command {
 	var out string
 
@@ -176,17 +273,14 @@ filename is used in the current directory.`,
 				if err != nil {
 					return err
 				}
-				path := resolveOutPath(out, name)
-
-				if _, err := downloader.NewDownloader().Download(api, loc).ToPath(ctx, path); err != nil {
+				result, err := saveDownload(out, name, func(dst io.WriterAt) error {
+					_, err := downloader.NewDownloader().Download(api, loc).Parallel(ctx, dst)
+					return err
+				})
+				if err != nil {
 					return errors.Wrap(err, "download")
 				}
-
-				info, err := os.Stat(path)
-				if err != nil {
-					return errors.Wrap(err, "stat downloaded file")
-				}
-				return a.printer.Emit(downloadResult{Path: path, Size: info.Size()})
+				return a.printer.Emit(result)
 			})
 		},
 	}

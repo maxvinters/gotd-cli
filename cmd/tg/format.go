@@ -11,6 +11,8 @@ import (
 	"github.com/gotd/td/telegram/message/peer"
 	"github.com/gotd/td/telegram/peers"
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 // Peer type names.
@@ -71,14 +73,16 @@ func (r peerListResult) MarshalText(w io.Writer) error {
 
 // label renders a peer reference for text output, e.g. "@durov" or "Some Group".
 func (p peerRef) label() string {
+	var label string
 	switch {
 	case p.Username != "":
-		return "@" + p.Username
+		label = "@" + p.Username
 	case p.Name != "":
-		return p.Name
+		label = p.Name
 	default:
-		return p.Type + "#" + strconv.FormatInt(p.ID, 10)
+		label = p.Type + "#" + strconv.FormatInt(p.ID, 10)
 	}
+	return output.EscapeTerminalText(label)
 }
 
 // describePeer resolves a peer to a peerRef using the entities from a query.

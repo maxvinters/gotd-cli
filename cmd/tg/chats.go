@@ -12,6 +12,8 @@ import (
 
 	"github.com/gotd/td/telegram/query"
 	"github.com/gotd/td/tg"
+
+	"github.com/gotd/cli/internal/output"
 )
 
 // chatItem describes one dialog.
@@ -48,7 +50,7 @@ func (l chatList) MarshalText(w io.Writer) error {
 			line += " [" + strings.Join(flags, ",") + "]"
 		}
 		if c.LastMessage != "" {
-			line += "  " + truncate(c.LastMessage, 60)
+			line += "  " + output.EscapeTerminalText(truncate(c.LastMessage, 60))
 		}
 		if _, err := fmt.Fprintln(w, line); err != nil {
 			return err

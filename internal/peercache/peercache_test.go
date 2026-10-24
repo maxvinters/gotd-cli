@@ -2,7 +2,9 @@ package peercache
 
 import (
 	"context"
+	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/gotd/td/telegram/peers"
@@ -50,6 +52,54 @@ func TestStorageRoundTrip(t *testing.T) {
 	hash, err := s2.GetContactsHash(ctx)
 	if err != nil || hash != 7 {
 		t.Errorf("GetContactsHash = %d, %v", hash, err)
+	}
+}
+
+func TestCacheWritesArePrivateAndRejectSymlinks(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "peers.json")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := peers.Key{Prefix: "user", ID: 42}
+	if err := s.Save(ctx, key, peers.Value{AccessHash: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Save(ctx, key, peers.Value{AccessHash: 2}); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); runtime.GOOS != "windows" && got != 0o600 {
+		t.Fatalf("rewritten cache mode = %04o, want 0600", got)
+	}
+
+	target := filepath.Join(dir, "target.json")
+	if err := os.WriteFile(target, []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	if err := s.Save(ctx, key, peers.Value{AccessHash: 3}); err == nil {
+		t.Fatal("cache write accepted a symlink destination")
+	}
+	if _, err := Open(path); err == nil {
+		t.Fatal("cache open followed a symlink")
+	}
+	got, err := os.ReadFile(target)
+	if err != nil || string(got) != "keep" {
+		t.Fatalf("symlink target = %q, %v; want unchanged", got, err)
 	}
 }
 

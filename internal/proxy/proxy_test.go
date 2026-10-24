@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/hex"
+	"strings"
 	"testing"
 )
 
@@ -70,5 +71,45 @@ func TestResolverMTProxy(t *testing.T) {
 	}
 	if r == nil {
 		t.Error("expected non-nil resolver")
+	}
+}
+
+func TestParseErrorsDoNotEchoProxySecretsOrCredentials(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		raw    string
+		secret string
+	}{
+		{
+			name:   "invalid MTProxy secret",
+			raw:    "tg://proxy?server=proxy.example&port=443&secret=PRIVATE_MT_SECRET_SENTINEL!",
+			secret: "PRIVATE_MT_SECRET_SENTINEL!",
+		},
+		{
+			name:   "malformed SOCKS URL",
+			raw:    "socks5://PRIVATE_USER_SENTINEL:PRIVATE_PASSWORD_SENTINEL@%zz",
+			secret: "PRIVATE_PASSWORD_SENTINEL",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := parse(tc.raw)
+			if err == nil {
+				t.Fatal("parse succeeded")
+			}
+			if strings.Contains(err.Error(), tc.secret) || strings.Contains(err.Error(), "PRIVATE_USER_SENTINEL") {
+				t.Fatalf("parse error exposed proxy credentials: %v", err)
+			}
+		})
+	}
+}
+
+func TestDecodeSecretErrorDoesNotEchoSecret(t *testing.T) {
+	const secret = "PRIVATE_MT_SECRET_SENTINEL!"
+	_, err := decodeSecret(secret)
+	if err == nil {
+		t.Fatal("decodeSecret succeeded")
+	}
+	if strings.Contains(err.Error(), secret) {
+		t.Fatalf("decode error exposed secret: %v", err)
 	}
 }
